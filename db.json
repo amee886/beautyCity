@@ -9,9 +9,10 @@
 
   "promo_codes": [
     {
-      "code": "kid20",
+      "code": "pregnant20",
       "description": "Скидка для беременных мам",
       "discount_percent": 20,
+      "procedure": "all",
       "conditions": {
         "client_status": "pregnant",
         "valid_months": "all"
@@ -21,6 +22,7 @@
       "code": "birthday",
       "description": "Скидка в честь дня рождения",
       "discount_percent": 15,
+      "procedure": "all",
       "conditions": {
         "birthday_only": true,
         "valid_months": "all"
@@ -30,9 +32,59 @@
       "code": "man10",
       "description": "Скидка для мужчин в декабре",
       "discount_percent": 10,
+      "procedure": "all",
       "conditions": {
         "gender": "male",
         "valid_months": ["12"]
+      }
+    },
+    {
+      "code": "kid30",
+      "description": "Скидка для детей",
+      "discount_percent": 10,
+      "procedure": "all",
+      "conditions": {
+        "kids_only": true,
+        "valid_months": "all"
+      }
+    },
+    {
+      "code": "blackfriday",
+      "description": "Черная пятница",
+      "discount_percent": 15,
+      "procedure": "all",
+      "conditions": {
+        "valid_months": "11"
+      }
+    },
+    {
+      "code": "knowledge_day",
+      "description": "Скидка для детей к 1 сентября",
+      "discount_percent": 30,
+      "procedure": "all",
+      "conditions": {
+        "kids_only": true,
+        "valid_months": "8"
+      }
+    },
+    {
+      "code": "8_march",
+      "description": "Международный женский день",
+      "discount_percent": 25,
+      "procedure": "all",
+      "conditions": {
+        "gender": "female",
+        "valid_months": "3"
+      }
+    },
+    {
+      "code": "23_february",
+      "description": "День защитника отечества",
+      "discount_percent": 25,
+      "procedure": "all",
+      "conditions": {
+        "gender": "male",
+        "valid_months": "2"
       }
     }
   ],
