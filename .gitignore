@@ -1,2 +1,12 @@
 .env
 __pycache__
+handlers/__pycache__/__init__.cpython-312.pyc
+handlers/__pycache__/info.cpython-312.pyc
+handlers/__pycache__/phone_reservation.cpython-312.pyc
+handlers/__pycache__/procedure_reservation.cpython-312.pyc
+handlers/__pycache__/salon_reservation.cpython-312.pyc
+handlers/__pycache__/start.cpython-312.pyc
+keyboards/__pycache__/__init__.cpython-312.pyc
+keyboards/__pycache__/menu.cpython-312.pyc
+keyboards/__pycache__/phone_reservation.cpython-312.pyc
+keyboards/__pycache__/procedure_reservation.cpython-312.pyc
