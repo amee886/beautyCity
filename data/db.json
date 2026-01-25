@@ -1,0 +1,171 @@
+{
+  "meta": {
+    "pd_agreement": {
+      "pdf_file": "pd_agreement.pdf"
+    },
+    "manager_phone": "+7-999-123-45-67",
+    "repeat_visit_days": 100
+  },
+
+  "promo_codes": [
+    {
+      "code": "pregnant20",
+      "description": "Скидка для беременных мам",
+      "discount_percent": 20,
+      "procedure": "all",
+      "conditions": {
+        "client_status": "pregnant",
+        "valid_months": "all"
+      }
+    },
+    {
+      "code": "birthday",
+      "description": "Скидка в честь дня рождения",
+      "discount_percent": 15,
+      "procedure": "all",
+      "conditions": {
+        "birthday_only": true,
+        "valid_months": "all"
+      }
+    },
+    {
+      "code": "man10",
+      "description": "Скидка для мужчин в декабре",
+      "discount_percent": 10,
+      "procedure": "all",
+      "conditions": {
+        "gender": "male",
+        "valid_months": ["12"]
+      }
+    },
+    {
+      "code": "kid30",
+      "description": "Скидка для детей",
+      "discount_percent": 10,
+      "procedure": "all",
+      "conditions": {
+        "kids_only": true,
+        "valid_months": "all"
+      }
+    },
+    {
+      "code": "blackfriday",
+      "description": "Черная пятница",
+      "discount_percent": 15,
+      "procedure": "all",
+      "conditions": {
+        "valid_months": "11"
+      }
+    },
+    {
+      "code": "knowledge_day",
+      "description": "Скидка для детей к 1 сентября",
+      "discount_percent": 30,
+      "procedure": "all",
+      "conditions": {
+        "kids_only": true,
+        "valid_months": "8"
+      }
+    },
+    {
+      "code": "8_march",
+      "description": "Международный женский день",
+      "discount_percent": 25,
+      "procedure": "all",
+      "conditions": {
+        "gender": "female",
+        "valid_months": "3"
+      }
+    },
+    {
+      "code": "23_february",
+      "description": "День защитника отечества",
+      "discount_percent": 25,
+      "procedure": "all",
+      "conditions": {
+        "gender": "male",
+        "valid_months": "2"
+      }
+    }
+  ],
+
+  "salons": [
+    {
+      "id": "salon_1",
+      "name": "Beauty City 1",
+      "address": "г. Москва, ул. Ленина, 10",
+      "phone": "+7-999-111-11-11"
+    },
+    {
+      "id": "salon_2",
+      "name": "Beauty City 2",
+      "address": "г. Москва, ул. Пушкина, 25",
+      "phone": "+7-999-222-22-22"
+    }
+  ],
+
+  "procedures": [
+    {
+      "id": "proc_1",
+      "name": "Стрижка",
+      "duration_min": 60,
+      "prices": {
+        "salon_1": 1500,
+        "salon_2": 1400
+      }
+    },
+    {
+      "id": "proc_2",
+      "name": "Маникюр",
+      "duration_min": 90,
+      "prices": {
+        "salon_1": 2000,
+        "salon_2": 1900
+      }
+    }
+  ],
+
+  "specialists": [
+    {
+      "id": "spec_1",
+      "name": "Анна",
+      "procedures": ["proc_1", "proc_2"],
+      "schedule": {
+        "2026-01-25": {
+          "salon_1": ["10:00", "12:00", "15:00"]
+        }
+      }
+    }
+  ],
+
+  "clients": [
+    {
+      "telegram_id": 123456789,
+      "name": "Ирина",
+      "phone": "+7-900-555-55-55",
+      "gender": "female",
+      "status": "pregnant",
+      "birthday": "1995-01-21",
+      "pd_accepted": true,
+      "favorite_specialist": "spec_1",
+      "last_visit": "2025-10-15"
+    }
+  ],
+
+  "appointments": [
+    {
+      "id": "app_1",
+      "client_telegram_id": 123456789,
+      "procedure_id": "proc_1",
+      "specialist_id": "spec_1",
+      "salon_id": "salon_1",
+      "date": "2026-01-25",
+      "time": "10:00",
+      "source": "bot",
+      "promo_code": "kid20",
+      "price_original": 1500,
+      "discount_percent": 20,
+      "price_final": 1200
+    }
+  ]
+}
