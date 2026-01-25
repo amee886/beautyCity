@@ -14,68 +14,8 @@ from keyboards.procedure_reservation import (
     make_confirmation_kb
 )
 
-
-SALONS = [
-    {
-        "id": "salon_1",
-        "name": "Beauty City 1",
-        "address": "г. Москва, ул. Ленина, 10",
-        "phone": "+7-999-111-11-11"
-    },
-    {
-        "id": "salon_2",
-        "name": "Beauty City 2",
-        "address": "г. Москва, ул. Пушкина, 25",
-        "phone": "+7-999-222-22-22"
-    }
-]
-
-
-SPECIALISTS = [
-    {
-        "id": "spec_1",
-        "name": "Анна",
-        "procedures": ["proc_1", "proc_2"],
-        "schedule": {
-            "2026-01-25": {
-                "salon_1": ["10:00", "12:00", "15:00"],
-                "salon_2": ["11:00", "14:00"]
-            },
-        }
-    },
-    {
-        "id": "spec_2",
-        "name": "Игорь",
-        "procedures": ["proc_1"],
-        "schedule": {
-            "2026-01-25": {
-                "salon_1": ["11:00", "13:00"]
-            }
-        }
-    }
-]
-
-
-PROCEDURES = [
-    {
-        "id": "proc_1",
-        "name": "Стрижка",
-        "duration_min": 60,
-        "prices": {
-            "salon_1": 1500,
-            "salon_2": 1400
-        }
-    },
-    {
-        "id": "proc_2",
-        "name": "Маникюр",
-        "duration_min": 90,
-        "prices": {
-            "salon_1": 2000,
-            "salon_2": 1900
-        }
-    }
-]
+from config import SALONS, PROCEDURES, SPECIALISTS
+from db_utils import save_appointment
 
 
 router = Router()
@@ -319,6 +259,19 @@ async def handle_pd(callback: types.CallbackQuery, state: FSMContext):
     )
 
     await state.update_data(summary=summary)
+    save_appointment(
+        user_id=callback.from_user.id,
+        procedure_id=proc["id"] if proc else None,
+        specialist_id=master.get("id") if master else None,
+        salon_id=salon["id"] if salon else None,
+        date=date,
+        time=time,
+        price_original=proc["prices"].get(salon["id"]) if proc and salon else None,
+        discount_percent=None,
+        price_final=None,
+        promo_code=None,
+        source="bot"
+    )
     await callback.message.edit_text(
         summary, 
         reply_markup=make_confirmation_kb()
@@ -330,7 +283,6 @@ async def handle_res_confirm(callback: types.CallbackQuery, state: FSMContext):
     await callback.answer("Запись подтверждена")
     data = await state.get_data()
     summary = data.get("summary")
-
     await callback.message.edit_text("Ваша запись подтверждена\n\n")
     await state.clear()
 

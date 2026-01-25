@@ -3,6 +3,7 @@ from decouple import config
 from aiogram import Bot, Dispatcher
 from handlers import register_routes
 
+
 TG_TOKEN = config('TELEGRAM_TOKEN')
 
 

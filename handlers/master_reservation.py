@@ -17,68 +17,8 @@ from keyboards.master_reservation import (
     generate_request_contact_kb
 )
 
-
-SALONS = [
-    {
-        "id": "salon_1",
-        "name": "Beauty City 1",
-        "address": "г. Москва, ул. Ленина, 10",
-        "phone": "+7-999-111-11-11"
-    },
-    {
-        "id": "salon_2",
-        "name": "Beauty City 2",
-        "address": "г. Москва, ул. Пушкина, 25",
-        "phone": "+7-999-222-22-22"
-    }
-]
-
-
-SPECIALISTS = [
-    {
-        "id": "spec_1",
-        "name": "Анна",
-        "procedures": ["proc_1", "proc_2"],
-        "schedule": {
-            "2026-01-25": {
-                "salon_1": ["10:00", "12:00", "15:00"],
-                "salon_2": ["11:00", "14:00"]
-            },
-        }
-    },
-    {
-        "id": "spec_2",
-        "name": "Игорь",
-        "procedures": ["proc_1"],
-        "schedule": {
-            "2026-01-25": {
-                "salon_1": ["11:00", "13:00"]
-            }
-        }
-    }
-]
-
-
-PROCEDURES = [
-    {
-        "id": "proc_1",
-        "name": "Стрижка",
-        "duration_min": 60,
-        "prices": {
-            "salon_1": 1500,
-            "salon_2": 1400
-        }
-    },
-    {
-        "id": "proc_2",
-        "name": "Маникюр",
-        "duration_min": 90,
-        "prices": {
-            "salon_1": 2000,
-            "salon_2": 1900
-        }
-    }
-]
+from config import SALONS, PROCEDURES, SPECIALISTS
+from db_utils import save_appointment
 
 
 SALONS_MAP = {s["id"]: s["name"] for s in SALONS}
@@ -215,7 +155,7 @@ async def enter_fio(message: types.Message, state: FSMContext):
         await message.reply("ФИО не может быть пустым, введите, пожалуйста")
         return
     await state.update_data(fio=fio)
-    await state.set_state(ReservationStates.enteringphone)
+    await state.set_state(ReservationStates.entering_phone)
     kb = generate_request_contact_kb()
     await message.answer("Пожалуйста, отправьте номер телефона (можно нажать кнопку ниже):", reply_markup=kb)
 
@@ -239,19 +179,24 @@ async def enter_phone(message: types.Message, state: FSMContext):
     await state.update_data(phone=phone)
     await state.set_state(ReservationStates.confirming_personal)
     await message.answer("Необходимо ваше согласие на обработку персональных данных", reply_markup=types.ReplyKeyboardRemove())
+
+    await message.answer(
+        "Согласны на обработку персональных данных?",
+        reply_markup=generate_personal_data_kb()
+)
     await message.answer("Согласны на обработку персональных данных?", reply_markup=generate_personal_data_kb())
 
 
 @router.callback_query(ConfirmCBData.filter())
 async def handle_confirm(callback: types.CallbackQuery, callbackdata: ConfirmCBData, state: FSMContext):
     await callback.answer()
-    action = callback_data.action
+    action = callbackdata.action
 
     if action == "accept_personal":
-        data = await state.getdata()
-        spec = SPECS_MAP.get(data.get("specid"))
-        proc = PROCS_MAP.get(data.get("procid"))
-        salon = next((s for s in SALONS if s["id"] == data.get("salonid")), None)
+        data = await state.get_data()
+        spec = SPECS_MAP.get(data.get("spec_id"))
+        proc = PROCS_MAP.get(data.get("proc_id"))
+        salon = next((s for s in SALONS if s["id"] == data.get("salon_id")), None)
         date = data.get("date")
         time = data.get("time")
         fio = data.get("fio")
@@ -276,16 +221,16 @@ async def handle_confirm(callback: types.CallbackQuery, callbackdata: ConfirmCBD
             await callback.message.edit_text(summary, reply_markup=generate_confirm_reservation_kb())
         return
 
-        if action == "decline_personal":
-            await state.clear()
+    if action == "decline_personal":
+        await state.clear()
         if callback.message:
             await callback.message.edit_text("Для записи требуется согласие на обработку персональных данных. Запись отменена.")
         return
 
     if action == "finalize":
         data = await state.get_data()
-        spec = SPECS_MAP.get(data.get("specid"))
-        proc = PROCS_MAP.get(data.get("procid"))
+        spec = SPECS_MAP.get(data.get("spec_id"))
+        proc = PROCS_MAP.get(data.get("proc_id"))
         salon = next((s for s in SALONS if s["id"] == data.get("salon_id")), None)
         date = data.get("date")
         time = data.get("time")

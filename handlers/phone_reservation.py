@@ -5,26 +5,10 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import ReplyKeyboardRemove 
 from keyboards.phone_reservation import salon_phone_kb, request_contact_kb, phone_confirm_kb
 
+from config import SALONS
 
 router = Router()
 TG_CHAT_ID = config('ADMIN_CHAT_ID')
-
-
-SALONS = [
-    {
-        "id": "salon_1",
-        "name": "Beauty City 1",
-        "address": "г. Москва, ул. Ленина, 10",
-        "phone": "+7-999-111-11-11"
-    },
-    {
-        "id": "salon_2",
-        "name": "Beauty City 2",
-        "address": "г. Москва, ул. Пушкина, 25",
-        "phone": "+7-999-222-22-22"
-    }
-  ]
-
 
 class PhoneReservationStates(StatesGroup):
     waiting_for_contact = State()

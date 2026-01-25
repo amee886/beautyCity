@@ -17,69 +17,11 @@ from keyboards.salon_reservation import (
     generate_request_contact_kb,
     make_confirmation_kb
 )
+from config import SALONS, PROCEDURES, SPECIALISTS
 
 
-SALONS = [
-    {
-        "id": "salon_1",
-        "name": "Beauty City 1",
-        "address": "г. Москва, ул. Ленина, 10",
-        "phone": "+7-999-111-11-11"
-    },
-    {
-        "id": "salon_2",
-        "name": "Beauty City 2",
-        "address": "г. Москва, ул. Пушкина, 25",
-        "phone": "+7-999-222-22-22"
-    }
-]
 
 
-SPECIALISTS = [
-    {
-        "id": "spec_1",
-        "name": "Анна",
-        "procedures": ["proc_1", "proc_2"],
-        "schedule": {
-            "2026-01-25": {
-                "salon_1": ["10:00", "12:00", "15:00"],
-                "salon_2": ["11:00", "14:00"]
-            },
-        }
-    },
-    {
-        "id": "spec_2",
-        "name": "Игорь",
-        "procedures": ["proc_1"],
-        "schedule": {
-            "2026-01-25": {
-                "salon_1": ["11:00", "13:00"]
-            }
-        }
-    }
-]
-
-
-PROCEDURES = [
-    {
-        "id": "proc_1",
-        "name": "Стрижка",
-        "duration_min": 60,
-        "prices": {
-            "salon_1": 1500,
-            "salon_2": 1400
-        }
-    },
-    {
-        "id": "proc_2",
-        "name": "Маникюр",
-        "duration_min": 90,
-        "prices": {
-            "salon_1": 2000,
-            "salon_2": 1900
-        }
-    }
-]
 
 
 router = Router()
@@ -237,6 +179,7 @@ async def phone_text(message: types.Message, state: FSMContext):
     await state.update_data(phone=phone)
     await state.set_state(SalonReservationStates.confirming)
     await message.answer("Спасибо, номер получен.", reply_markup=ReplyKeyboardRemove())
+
     await message.answer("Необходимо ваше согласие на обработку персональных данных.", reply_markup=generate_confirm_kb())
 
 
@@ -289,7 +232,7 @@ async def pd_consent_no(callback: types.CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "res:confirm")
 async def handle_res_confirm(callback: types.CallbackQuery, state: FSMContext):
     await callback.answer("Запись подтверждена")
-    data = await state.getdata()
+    data = await state.get_data()
     summary = data.get("summary", "Ваша запись сохранена.")
     await callback.message.edit_text(f"Ваша запись подтверждена\n\n{summary}")
     await state.clear()
