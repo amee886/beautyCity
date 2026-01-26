@@ -178,6 +178,34 @@
       "price_original": null,
       "discount_percent": null,
       "price_final": null
+    },
+    {
+      "id": "app_2",
+      "client_telegram_id": 775982956,
+      "procedure_id": null,
+      "specialist_id": null,
+      "salon_id": null,
+      "date": "2026-01-25",
+      "time": "15-00",
+      "source": "bot",
+      "promo_code": null,
+      "price_original": null,
+      "discount_percent": null,
+      "price_final": null
+    },
+    {
+      "id": "app_3",
+      "client_telegram_id": 1031327268,
+      "procedure_id": null,
+      "specialist_id": null,
+      "salon_id": null,
+      "date": "2026-01-25",
+      "time": "12-00",
+      "source": "bot",
+      "promo_code": null,
+      "price_original": null,
+      "discount_percent": null,
+      "price_final": null
     }
   ]
 }
