@@ -15,13 +15,13 @@ from keyboards.salon_reservation import (
     generate_time_kb,
     generate_confirm_kb,
     generate_request_contact_kb,
-    make_confirmation_kb
+    make_confirmation_kb,
+    get_promocode_kb
 )
-from config import SALONS, PROCEDURES, SPECIALISTS
+from config import SALONS, PROCEDURES, SPECIALISTS, PROMOCODES
 
 
-
-
+PROMOCODES_MAP = {c["code"]: c for c in PROMOCODES}
 
 
 router = Router()
@@ -34,6 +34,7 @@ class SalonReservationStates(StatesGroup):
     choosing_time = State()
     entering_fio = State()
     entering_phone = State()
+    entering_promocode = State()
     confirming = State()
 
 
@@ -159,8 +160,11 @@ async def phone_contact(message: types.Message, state: FSMContext):
     phone = message.contact.phone_number.strip()
     await state.update_data(phone=phone)
     await message.answer("Контакт получен", reply_markup=ReplyKeyboardRemove())
-    await state.set_state(SalonReservationStates.confirming)
-    await message.answer("Необходимо ваше согласие на обработку персональных данных", reply_markup=generate_confirm_kb())
+    await state.set_state(SalonReservationStates.entering_promocode)
+    await message.answer(
+        text="Введите промокод, чтобы получить скидку!",
+        reply_markup=get_promocode_kb()
+    )
 
 
 @router.message(SalonReservationStates.entering_phone)
@@ -177,10 +181,46 @@ async def phone_text(message: types.Message, state: FSMContext):
         return
 
     await state.update_data(phone=phone)
-    await state.set_state(SalonReservationStates.confirming)
+    await state.set_state(SalonReservationStates.entering_promocode)
     await message.answer("Спасибо, номер получен.", reply_markup=ReplyKeyboardRemove())
 
-    await message.answer("Необходимо ваше согласие на обработку персональных данных.", reply_markup=generate_confirm_kb())
+    await message.answer(
+        text="Введите промокод, чтобы получить скидку!",
+        reply_markup=get_promocode_kb()
+    )
+
+
+@router.message(SalonReservationStates.entering_promocode)
+async def enter_promocode(message: types.Message, state: FSMContext):
+    """Обработка ожидания промокода от пользователя."""
+    users_promocode = message.text.strip().lower()
+
+    if users_promocode in PROMOCODES_MAP:
+        discount_percent = PROMOCODES_MAP[users_promocode]["discount_percent"]
+        await message.answer(
+            text=f"Поздравляем! Вы получили скидку {discount_percent}%"
+        )
+        await state.update_data(discount_percent=discount_percent)
+        await state.set_state(SalonReservationStates.confirming)
+        await message.answer(
+            text="Необходимо ваше согласие на обработку персональных данных",
+            reply_markup=generate_confirm_kb(),
+        )
+    else:
+        await message.answer(
+            text="К сожалению такого промокода не существует :(\nПопробуете ещё раз",
+            reply_markup=get_promocode_kb()
+        )
+
+
+@router.callback_query(F.data == "continue")
+async def skip_promocode(callback: types.CallbackQuery, state: FSMContext):
+    await state.set_state(SalonReservationStates.confirming)
+
+    await callback.message.answer(
+        text="Необходимо ваше согласие на обработку персональных данных",
+        reply_markup=generate_confirm_kb(),
+    )
 
 
 @router.callback_query(F.data == ConfirmCB(ok="yes").pack())

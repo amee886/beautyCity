@@ -6,7 +6,6 @@
     "manager_phone": "+7-999-123-45-67",
     "repeat_visit_days": 100
   },
-
   "promo_codes": [
     {
       "code": "pregnant20",
@@ -35,13 +34,15 @@
       "procedure": "all",
       "conditions": {
         "gender": "male",
-        "valid_months": ["12"]
+        "valid_months": [
+          "12"
+        ]
       }
     },
     {
       "code": "kid30",
       "description": "Скидка для детей",
-      "discount_percent": 10,
+      "discount_percent": 30,
       "procedure": "all",
       "conditions": {
         "kids_only": true,
@@ -88,7 +89,6 @@
       }
     }
   ],
-
   "salons": [
     {
       "id": "salon_1",
@@ -103,7 +103,6 @@
       "phone": "+7-999-222-22-22"
     }
   ],
-
   "procedures": [
     {
       "id": "proc_1",
@@ -124,20 +123,34 @@
       }
     }
   ],
-
   "specialists": [
     {
       "id": "spec_1",
       "name": "Анна",
-      "procedures": ["proc_1", "proc_2"],
+      "procedures": [
+        "proc_1",
+        "proc_2"
+      ],
       "schedule": {
         "2026-01-25": {
-          "salon_1": ["10:00", "12:00", "15:00"]
+          "salon_1": [
+            "10:00",
+            "12:00",
+            "15:00"
+          ]
+        },
+        "2026-02-01": {
+          "salon_2": [
+            "10:00",
+            "11:00",
+            "12:00",
+            "13:00",
+            "14:00"
+          ]
         }
       }
     }
   ],
-
   "clients": [
     {
       "telegram_id": 123456789,
@@ -151,21 +164,20 @@
       "last_visit": "2025-10-15"
     }
   ],
-
   "appointments": [
     {
       "id": "app_1",
-      "client_telegram_id": 123456789,
-      "procedure_id": "proc_1",
-      "specialist_id": "spec_1",
-      "salon_id": "salon_1",
-      "date": "2026-01-25",
-      "time": "10:00",
+      "client_telegram_id": 650335217,
+      "procedure_id": null,
+      "specialist_id": null,
+      "salon_id": null,
+      "date": "2026-02-01",
+      "time": "13-00",
       "source": "bot",
-      "promo_code": "kid20",
-      "price_original": 1500,
-      "discount_percent": 20,
-      "price_final": 1200
+      "promo_code": null,
+      "price_original": null,
+      "discount_percent": null,
+      "price_final": null
     }
   ]
 }

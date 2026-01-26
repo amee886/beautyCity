@@ -14,16 +14,18 @@ from keyboards.master_reservation import (
     generate_time_kb,
     generate_personal_data_kb,
     generate_confirm_reservation_kb,
-    generate_request_contact_kb
+    generate_request_contact_kb,
+    get_promocode_kb
 )
 
-from config import SALONS, PROCEDURES, SPECIALISTS
+from config import SALONS, PROCEDURES, SPECIALISTS, PROMOCODES
 from db_utils import save_appointment
 
 
 SALONS_MAP = {s["id"]: s["name"] for s in SALONS}
 PROCS_MAP = {p["id"]: p for p in PROCEDURES}
 SPECS_MAP = {s["id"]: s for s in SPECIALISTS}
+PROMOCODES_MAP = {c["code"]: c for c in PROMOCODES}
 
 
 router = Router()
@@ -35,6 +37,7 @@ class ReservationStates(StatesGroup):
     choosing_salon = State()
     entering_fio = State()
     entering_phone = State()
+    entering_promocode = State()
     confirming_personal = State()
     confirming_reservation = State()
 
@@ -177,20 +180,51 @@ async def enter_phone(message: types.Message, state: FSMContext):
         return
 
     await state.update_data(phone=phone)
-    await state.set_state(ReservationStates.confirming_personal)
-    await message.answer("Необходимо ваше согласие на обработку персональных данных", reply_markup=types.ReplyKeyboardRemove())
+    await state.set_state(ReservationStates.entering_promocode)
 
     await message.answer(
-        "Согласны на обработку персональных данных?",
-        reply_markup=generate_personal_data_kb()
-)
-    await message.answer("Согласны на обработку персональных данных?", reply_markup=generate_personal_data_kb())
+        text="Введите промокод, чтобы получить скидку!",
+        reply_markup=get_promocode_kb()
+    )
+
+
+@router.message(ReservationStates.entering_promocode)
+async def enter_promocode(message: types.Message, state: FSMContext):
+    """Обработка ожидания промокода от пользователя."""
+    users_promocode = message.text.strip().lower()
+
+    if users_promocode in PROMOCODES_MAP:
+        discount_percent = PROMOCODES_MAP[users_promocode]["discount_percent"]
+        await message.answer(
+            text=f"Поздравляем! Вы получили скидку {discount_percent}%"
+        )
+        await state.update_data(discount_percent=discount_percent)
+        await state.set_state(ReservationStates.confirming_personal)
+        await message.answer(
+            text="Необходимо ваше согласие на обработку персональных данных",
+            reply_markup=generate_personal_data_kb(),
+        )
+    else:
+        await message.answer(
+            text="К сожалению такого промокода не существует :(\nПопробуете ещё раз",
+            reply_markup=get_promocode_kb()
+        )
+
+
+@router.callback_query(F.data == "continue")
+async def skip_promocode(callback: types.CallbackQuery, state: FSMContext):
+    await state.set_state(ReservationStates.confirming_personal)
+
+    await callback.message.answer(
+        text="Необходимо ваше согласие на обработку персональных данных",
+        reply_markup=generate_personal_data_kb(),
+    )
 
 
 @router.callback_query(ConfirmCBData.filter())
-async def handle_confirm(callback: types.CallbackQuery, callbackdata: ConfirmCBData, state: FSMContext):
+async def handle_confirm(callback: types.CallbackQuery, callback_data: ConfirmCBData, state: FSMContext):
     await callback.answer()
-    action = callbackdata.action
+    action = callback_data.action
 
     if action == "accept_personal":
         data = await state.get_data()
@@ -201,22 +235,27 @@ async def handle_confirm(callback: types.CallbackQuery, callbackdata: ConfirmCBD
         time = data.get("time")
         fio = data.get("fio")
         phone = data.get("phone")
+        discount = data.get("discount_percent")
 
         price = proc["prices"].get(salon["id"]) if proc and salon else None
-        pricetext = f"\\nСтоимость: {price}р" if price else ""
+
+        if discount:
+            price = price * (100 - discount) / 100
+
+        pricetext = f"\nСтоимость: {price}р" if price else ""
 
         summary = (
-            f"Подтвердите запись:\\n\\n"
-            f"Мастер: {spec['name']}\\n"
-            f"Процедура: {proc['name']}{pricetext}\\n"
-            f"Дата: {date}\\n"
-            f"Время: {time}\\n"
-            f"Салон: {salon['name']}\\n\\n"
-            f"Клиент: {fio}\\n"
-            f"Телефон: {phone}\\n"
+            f"Подтвердите запись:\n\n"
+            f"Мастер: {spec['name']}\n"
+            f"Процедура: {proc['name']}{pricetext}\n"
+            f"Дата: {date}\n"
+            f"Время: {time}\n"
+            f"Салон: {salon['name']}\n\n"
+            f"Клиент: {fio}\n"
+            f"Телефон: {phone}\n"
         )
 
-        await state.set_state(ReservationStates.confirmingreservation)
+        await state.set_state(ReservationStates.confirming_reservation)
         if callback.message:
             await callback.message.edit_text(summary, reply_markup=generate_confirm_reservation_kb())
         return

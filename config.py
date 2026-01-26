@@ -13,5 +13,6 @@ with open(DB_PATH, "r", encoding="utf-8") as f:
 SALONS = DB["salons"]
 PROCEDURES = DB["procedures"]
 SPECIALISTS = DB["specialists"]
+PROMOCODES = DB["promo_codes"]
 
 PD_PDF_PATH = BASE_DIR / "data" / DB["meta"]["pd_agreement"]["pdf_file"]

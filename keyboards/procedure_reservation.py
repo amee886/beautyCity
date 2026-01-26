@@ -99,3 +99,19 @@ def make_confirmation_kb():
         [InlineKeyboardButton(text="Подтвердить запись", callback_data="res:confirm")],
         [InlineKeyboardButton(text="Отменить", callback_data="res:cancel")],
     ])
+
+
+def get_promocode_kb():
+    """Создать клавиатуру для шага с промокодом."""
+    decline_btn = InlineKeyboardButton(
+        text="Пропустить",
+        callback_data="continue",
+    )
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [decline_btn],
+        ]
+    )
+
+    return keyboard

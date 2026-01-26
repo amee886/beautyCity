@@ -102,7 +102,7 @@ def generate_time_kb(spec_id, date, schedule_for_date, salons_map):
 
 
 def generate_personal_data_kb():
-    keyboard = InlineKeyboardMarkup(inline_key_board=[
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(text="Согласен(на) на обработку пд", callback_data=ConfirmCBData(action="accept_personal").pack()),
             InlineKeyboardButton(text="Не согласен(на) на обработку пд", callback_data=ConfirmCBData(action="decline_personal").pack()),
@@ -131,6 +131,22 @@ def generate_request_contact_kb():
         ],
         resize_keyboard=True,
         one_time_keyboard=True
+    )
+
+    return keyboard
+
+
+def get_promocode_kb():
+    """Создать клавиатуру для шага с промокодом."""
+    decline_btn = InlineKeyboardButton(
+        text="Пропустить",
+        callback_data="continue",
+    )
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [decline_btn],
+        ]
     )
 
     return keyboard
