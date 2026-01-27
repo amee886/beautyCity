@@ -4,30 +4,33 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import ReplyKeyboardRemove
 from keyboards.salon_reservation import (
-    SalonCB,
-    ProcedureCB,
-    DateCB,
-    TimeCB,
-    ConfirmCB,
-    generate_salons_kb, 
-    generate_procedures_kb,
-    generate_dates_kb,
+    SalonCBData,
+    ProcedureCBData,
+    DateCBData,
+    TimeCBData,
+    ConfirmCBData,
+    generate_salon_kb, 
+    generate_procedure_kb,
+    generate_date_kb,
     generate_time_kb,
-    generate_confirm_kb,
+    generate_personal_data_kb,
     generate_request_contact_kb,
-    make_confirmation_kb,
+    generate_confirm_reservation_kb,
     get_promocode_kb
 )
 from config import SALONS, PROCEDURES, SPECIALISTS, PROMOCODES
 
 
+SALONS_MAP = {s["id"]: s for s in SALONS}
+PROCS_MAP = {p["id"]: p for p in PROCEDURES}
+SPECS_MAP = {s["id"]: s for s in SPECIALISTS}
 PROMOCODES_MAP = {c["code"]: c for c in PROMOCODES}
 
 
 router = Router()
 
 
-class SalonReservationStates(StatesGroup):
+class ReservationStates(StatesGroup):
     choosing_salon = State()
     choosing_procedure = State()
     choosing_date = State()
@@ -35,34 +38,14 @@ class SalonReservationStates(StatesGroup):
     entering_fio = State()
     entering_phone = State()
     entering_promocode = State()
-    confirming = State()
+    confirming_personal = State()
+    confirming_reservation = State()
 
 
-def get_salon_by_id(salon_id):
-    for s in SALONS:
-        if s["id"] == salon_id:
-            return s
-    return None
-
-
-def get_proc_by_id(proc_id):
-    for p in PROCEDURES:
-        if p.get("id") == proc_id:
-            return p
-    return None
-
-
-def get_spec_by_id(spec_id):
-    for sp in SPECIALISTS:
-        if sp.get("id") == spec_id:
-            return sp
-    return None
-
-
-@router.callback_query(F.data == "reserve_by_salon")
+@router.callback_query(F.data == "salon_reservation")
 @router.message(F.text == "Запись по салону")
-async def reserve_by_salon(update: types.Message | types.CallbackQuery):
-    kb = generate_salons_kb(SALONS)
+async def salon_reservation(update: types.Message | types.CallbackQuery, state: FSMContext):
+    kb = generate_salon_kb(SALONS)
     if isinstance(update, types.Message):
         await update.answer(
             "Выберите салон:",
@@ -73,116 +56,122 @@ async def reserve_by_salon(update: types.Message | types.CallbackQuery):
             "Выберите салон:",
             reply_markup=kb
         )
-        await update.answer()
+    await state.set_state(ReservationStates.choosing_salon)
 
 
-@router.callback_query(SalonCB.filter(), F.data.startswith("salon:" ))
-async def salon_chosen(callback: types.CallbackQuery, callback_data: SalonCB, state: FSMContext):
+@router.callback_query(SalonCBData.filter())
+async def choose_salon(callback: types.CallbackQuery, callback_data: SalonCBData, state: FSMContext):
     salon_id = callback_data.salon
-    salon = get_salon_by_id(salon_id)
-    if not salon:
-        await callback.answer("Салон не найден", show_alert=True)
-        return
-    await state.update_data(salon_id=salon_id)
-    await callback.message.edit_text(
-        f"Вы выбрали {salon['name']}\nВыберите процедуру:",
-        reply_markup=generate_procedures_kb(PROCEDURES, salon_id)
-    )
-    await state.set_state(SalonReservationStates.choosing_procedure)
+    salon = SALONS_MAP.get(salon_id, {})
+    await state.update_data(salon_id=salon_id, salon_name=salon.get("name"))
+    kb = generate_procedure_kb(salon_id, PROCEDURES)
+    await callback.message.edit_text(f"Выбран салон: {salon.get('name')}\nВыберите процедуру:", reply_markup=kb)
+    await state.set_state(ReservationStates.choosing_procedure)
     await callback.answer()
 
 
-@router.callback_query(ProcedureCB.filter(), F.data.startswith("proc:"))
-async def procedurechosen(callback: types.CallbackQuery, callback_data: ProcedureCB, state: FSMContext):
+@router.callback_query(ProcedureCBData.filter())
+async def choose_procedure(callback: types.CallbackQuery, callback_data: ProcedureCBData, state: FSMContext):
     proc_id = callback_data.proc
-    proc = get_proc_by_id(proc_id)
-    if not proc:
-        await callback.answer("Процедура не найдена", show_alert=True)
-        return
-    st = await state.get_data()
-    salon_id = st.get("salon_id")
-    await state.update_data(proc_id=proc_id)
-    await callback.message.edit_text(
-        f"Процедура: {proc['name']}\nВыберите дату:",
-        reply_markup=generate_dates_kb(salon_id, proc_id, SPECIALISTS)
-    )
-    await state.set_state(SalonReservationStates.choosing_date)
+    proc = PROCS_MAP.get(proc_id, {})
+    await state.update_data(proc_id=proc_id, proc_name=proc.get("name"), proc_price=proc.get("prices", {}))
+    data = await state.get_data()
+    salon_id = data.get("salon_id")
+    kb = generate_date_kb(salon_id, PROCEDURES, SPECIALISTS)
+    await callback.message.edit_text(f"Процедура: {proc.get('name')}\nВыберите дату:", reply_markup=kb)
+    await state.set_state(ReservationStates.choosing_date)
     await callback.answer()
 
 
-@router.callback_query(DateCB.filter(), F.data.startswith("date:"))
-async def choose_date(callback: types.CallbackQuery, callback_data: DateCB, state: FSMContext):
+@router.callback_query(DateCBData.filter())
+async def choose_date(callback: types.CallbackQuery, callback_data: DateCBData, state: FSMContext):
     date = callback_data.date
-    st = await state.get_data()
-    salon_id = st.get("salon_id")
-    proc_id = st.get("proc_id")
     await state.update_data(date=date)
+    data = await state.get_data()
+    salon_id = data.get("salon_id")
+    proc_id = data.get("proc_id")
     kb = generate_time_kb(salon_id, proc_id, date, SPECIALISTS)
     if not kb.inline_keyboard:
         await callback.answer("Свободных времён на эту дату нет", show_alert=True)
         return
     await callback.message.edit_text("Выберите время (вместе с мастером):", reply_markup=kb)
-    await state.set_state(SalonReservationStates.choosing_time)
+    await state.set_state(ReservationStates.choosing_time)
     await callback.answer()
 
 
-@router.callback_query(TimeCB.filter(), F.data.startswith("time:"))
-async def choose_time(callback: types.CallbackQuery, callback_data: TimeCB, state: FSMContext):
+@router.callback_query(TimeCBData.filter())
+async def choose_time(callback: types.CallbackQuery, callback_data: TimeCBData, state: FSMContext):
     spec_id = callback_data.spec
-    time = callback_data.time
-    spec = get_spec_by_id(spec_id)
+    time = callback_data.time.replace("-", ":")
+    spec = SPECS_MAP.get(spec_id, {})
     if not spec:
         await callback.answer("Мастер не найден", show_alert=True)
         return
-    await state.update_data(spec_id=spec_id, time=time)
-    await state.set_state(SalonReservationStates.entering_fio)
-    await callback.message.edit_text("Введите, пожалуйста, ваше ФИО:")
+
+    await state.update_data(spec_id=spec_id, spec_name=spec.get("name"), time=time)
+    await state.set_state(ReservationStates.entering_fio)
+
+    data = await state.get_data()
+    salon_id = data.get("salon_id")
+    proc_id = data.get("proc_id")
+    date = data.get("date")
+    salon = next((s for s in SALONS if s["id"] == salon_id), None)
+    proc = PROCS_MAP.get(proc_id)
+    salon_text = salon["name"] if salon else salon_id
+    proc_text = proc["name"] if proc else proc_id
+    text = (
+        f"Вы выбрали:\n"
+        f"Мастер: {spec.get('name')}\n"
+        f"Процедура: {proc_text}\n"
+        f"Дата: {date}\n"
+        f"Время: {time}\n"
+        f"Салон: {salon_text}\n\n"
+        "Введите ФИО клиента:"
+    )
+    if callback.message:
+        await callback.message.edit_text(text)
     await callback.answer()
 
 
-@router.message(SalonReservationStates.entering_fio)
+@router.message(ReservationStates.entering_fio)
 async def enter_fio(message: types.Message, state: FSMContext):
     fio = (message.text or "").strip()
     if not fio:
-        await message.reply("Пожалуйста, введите корректное ФИО.")
+        await message.reply("ФИО не может быть пустым, введите, пожалуйста")
         return
-
     await state.update_data(fio=fio)
-    await state.set_state(SalonReservationStates.entering_phone)
-    await message.answer(
-        "Хорошо! Отправьте номер телефона (или нажмите «Отправить контакт»):",
-        reply_markup=generate_request_contact_kb()
-    )
+    await state.set_state(ReservationStates.entering_phone)
+    kb = generate_request_contact_kb()
+    await message.answer("Пожалуйста, отправьте номер телефона (можно нажать кнопку ниже):", reply_markup=kb)
 
 
-@router.message(SalonReservationStates.entering_phone, F.contact)
+@router.message(ReservationStates.entering_phone, F.contact)
 async def phone_contact(message: types.Message, state: FSMContext):
     phone = message.contact.phone_number.strip()
     await state.update_data(phone=phone)
     await message.answer("Контакт получен", reply_markup=ReplyKeyboardRemove())
-    await state.set_state(SalonReservationStates.entering_promocode)
+    await state.set_state(ReservationStates.entering_promocode)
     await message.answer(
         text="Введите промокод, чтобы получить скидку!",
         reply_markup=get_promocode_kb()
     )
 
 
-@router.message(SalonReservationStates.entering_phone)
-async def phone_text(message: types.Message, state: FSMContext):
-    phone = (message.text or "").strip()
-
-    if phone == "Ввести вручную":
-        await message.reply("Пожалуйста, введите номер телефона вручную (например, +7**********).")
+@router.message(ReservationStates.entering_phone)
+async def enter_phone(message: types.Message, state: FSMContext):
+    text = (message.text or "").strip()
+    if text.lower() == "отмена":
+        await state.clear()
+        await message.answer("Запись отменена", reply_markup=types.ReplyKeyboardRemove())
         return
+    phone = text
 
-    digits = "".join(c for c in phone if c.isdigit())
-    if len(digits) < 7:
-        await message.reply("Пожалуйста, введите корректный номер телефона.")
+    if not phone or len(phone) < 5:
+        await message.reply("Пожалуйста, введите корректный номер телефона")
         return
 
     await state.update_data(phone=phone)
-    await state.set_state(SalonReservationStates.entering_promocode)
-    await message.answer("Спасибо, номер получен.", reply_markup=ReplyKeyboardRemove())
+    await state.set_state(ReservationStates.entering_promocode)
 
     await message.answer(
         text="Введите промокод, чтобы получить скидку!",
@@ -190,9 +179,8 @@ async def phone_text(message: types.Message, state: FSMContext):
     )
 
 
-@router.message(SalonReservationStates.entering_promocode)
+@router.message(ReservationStates.entering_promocode)
 async def enter_promocode(message: types.Message, state: FSMContext):
-    """Обработка ожидания промокода от пользователя."""
     users_promocode = message.text.strip().lower()
 
     if users_promocode in PROMOCODES_MAP:
@@ -201,10 +189,10 @@ async def enter_promocode(message: types.Message, state: FSMContext):
             text=f"Поздравляем! Вы получили скидку {discount_percent}%"
         )
         await state.update_data(discount_percent=discount_percent)
-        await state.set_state(SalonReservationStates.confirming)
+        await state.set_state(ReservationStates.confirming_personal)
         await message.answer(
             text="Необходимо ваше согласие на обработку персональных данных",
-            reply_markup=generate_confirm_kb(),
+            reply_markup=generate_personal_data_kb(),
         )
     else:
         await message.answer(
@@ -215,71 +203,81 @@ async def enter_promocode(message: types.Message, state: FSMContext):
 
 @router.callback_query(F.data == "continue")
 async def skip_promocode(callback: types.CallbackQuery, state: FSMContext):
-    await state.set_state(SalonReservationStates.confirming)
+    await state.set_state(ReservationStates.confirming_personal)
 
     await callback.message.answer(
         text="Необходимо ваше согласие на обработку персональных данных",
-        reply_markup=generate_confirm_kb(),
+        reply_markup=generate_personal_data_kb(),
     )
 
 
-@router.callback_query(F.data == ConfirmCB(ok="yes").pack())
-async def pd_consent_yes(callback: types.CallbackQuery, state: FSMContext):
-    await callback.answer("Спасибо за согласие")
-    await state.update_data(personal_data_consent=True)
-    await state.set_state(SalonReservationStates.confirming)
+@router.callback_query(ConfirmCBData.filter())
+async def handle_confirm(callback: types.CallbackQuery, callback_data: ConfirmCBData, state: FSMContext):
+    await callback.answer()
+    action = callback_data.action
 
-    data = await state.get_data()
-    proc = data.get("procedure")
-    proc_name = proc.get("name") if isinstance(proc, dict) else (proc or "—")
-    proc_price = proc.get("price") if isinstance(proc, dict) else None
+    if action == "accept_personal":
+        data = await state.get_data()
+        print("DEBUG handle_confirm data:", data)
 
-    salon = data.get("salon")
-    salon_name = salon.get("name", "-")
+        spec_id = data.get("spec_id")
+        proc_id = data.get("proc_id")
+        salon_id = data.get("salon_id")
+    
+        spec_name = SPECS_MAP.get(spec_id, {}).get("name", "—") if spec_id else "—"
+        proc_name = PROCS_MAP.get(proc_id, {}).get("name", "—") if proc_id else "—"
+        salon_name = SALONS_MAP.get(salon_id, {}).get("name", "-") if salon_id else "-"
 
-    master = data.get("master") or {}
-    master_name = master.get("name", "—")
+        date = data.get("date", "-")
+        time = data.get("time", "-")
+        fio = data.get("fio", "-")
+        phone = data.get("phone", "-")
+        discount = data.get("discount_percent")
 
-    fio = data.get("fio", "-")
-    phone = data.get("phone", "-")
-    date = data.get("date", "-")
-    time = data.get("time", "-")
-    price_text = f" — {proc_price}₽" if proc_price is not None else ""
-    summary = (
-        f"Пожалуйста, подтвердите запись:\n\n"
-        f"Салон: {salon_name}\n"
-        f"Процедура: {proc_name}{price_text}\n"
-        f"Дата: {date}\n"
-        f"Время: {time}\n"
-        f"Мастер: {master_name}\n"
-        f"ФИО: {fio}\n"
-        f"Телефон: {phone}\n\n"
-    )
+        proc_price = PROCS_MAP.get(proc_id, {}).get("prices", {}) if proc_id else {}
+        price = proc_price.get(salon_id) if salon_id and proc_price else None
+        if discount and price:
+            price = price * (100 - discount) / 100
+        pricetext = f"\nСтоимость: {price}р" if price else ""
 
-    await state.update_data(summary=summary)
-    await callback.message.edit_text(
-        summary, 
-        reply_markup=generate_confirm_kb()
-    )
+        summary = (
+            f"Подтвердите запись:\n\n"
+            f"Мастер: {spec_name}\n"
+            f"Процедура: {proc_name}{pricetext}\n"
+            f"Дата: {date}\n"
+            f"Время: {time}\n"
+            f"Салон: {salon_name}\n\n"
+            f"Клиент: {fio}\n"
+            f"Телефон: {phone}\n"
+        )
 
-@router.callback_query(F.data == ConfirmCB(ok="no").pack())
-async def pd_consent_no(callback: types.CallbackQuery, state: FSMContext):
-    await callback.answer("Вы не дали согласие")
-    await callback.message.edit_text("Для оформления записи необходимо согласие на обработку персональных данных. Запись отменена.")
-    await state.clear()
+        await state.set_state(ReservationStates.confirming_reservation)
+        if callback.message:
+            await callback.message.edit_text(summary, reply_markup=generate_confirm_reservation_kb())
+        return
 
+    if action == "decline_personal":
+        await state.clear()
+        if callback.message:
+            await callback.message.edit_text("Для записи требуется согласие на обработку персональных данных. Запись отменена.")
+        return
 
-@router.callback_query(F.data == "res:confirm")
-async def handle_res_confirm(callback: types.CallbackQuery, state: FSMContext):
-    await callback.answer("Запись подтверждена")
-    data = await state.get_data()
-    summary = data.get("summary", "Ваша запись сохранена.")
-    await callback.message.edit_text(f"Ваша запись подтверждена\n\n{summary}")
-    await state.clear()
+    if action == "finalize":
+        data = await state.get_data()
+        spec = SPECS_MAP.get(data.get("spec_id"))
+        proc = PROCS_MAP.get(data.get("proc_id"))
+        salon = next((s for s in SALONS if s["id"] == data.get("salon_id")), None)
+        date = data.get("date")
+        time = data.get("time")
+        fio = data.get("fio")
+        phone = data.get("phone")
+        await state.clear()
+        if callback.message:
+            await callback.message.edit_text("Ваша запись подтверждена. Спасибо!")
+        return
 
-
-@router.callback_query(F.data == "res:cancel")
-async def handle_res_cancel(callback: types.CallbackQuery, state: FSMContext):
-    await callback.answer("Запись отменена")
-    await callback.message.edit_text("Запись отменена пользователем")
-    await state.clear()
+    if action == "cancel":
+        await state.clear()
+        if callback.message:
+            await callback.message.edit_text("Запись отменена.")
+        return

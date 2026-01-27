@@ -7,31 +7,35 @@ from aiogram.types import (
 )
 
 
-class SalonCB(CallbackData, prefix="salon"):
+class SalonCBData(CallbackData, prefix="salon"):
     salon: str
 
-class ProcedureCB(CallbackData, prefix="proc"):
+
+class ProcedureCBData(CallbackData, prefix="proc"):
     proc: str
 
-class DateCB(CallbackData, prefix="date"):
+
+class DateCBData(CallbackData, prefix="date"):
     date: str
 
-class TimeCB(CallbackData, prefix="time"):
+
+class TimeCBData(CallbackData, prefix="time"):
     spec: str
     time: str
 
-class ConfirmCB(CallbackData, prefix="confirm"):
-    ok: str
+
+class ConfirmCBData(CallbackData, prefix="confirm"):
+    action: str
 
 
-def generate_salons_kb(salons):
+def generate_salon_kb(salons):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[])
     for salon in salons:
         keyboard.inline_keyboard.append(
             [
                 InlineKeyboardButton(
                     text=f"{salon['name']} ({salon['address']})",
-                    callback_data=SalonCB(salon=salon['id']).pack()
+                    callback_data=SalonCBData(salon=salon['id']).pack()
                 )
             ]
         )
@@ -39,89 +43,92 @@ def generate_salons_kb(salons):
     return keyboard
 
 
-def generate_procedures_kb(procedures, salon_id):
+def generate_procedure_kb(salon_id, procedures):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[])
-    for procedure in procedures:
-        price = procedure.get("prices", {}).get(salon_id, "—")
+    for proc in procedures:
+        price = proc.get("prices", {}).get(salon_id, "—")
         keyboard.inline_keyboard.append(
             [
                 InlineKeyboardButton(
-                    text=f"{procedure.get('name')} — {price}₽",
-                    callback_data=ProcedureCB(proc=procedure['id']).pack()
+                    text=f"{proc.get('name')} — {price}₽",
+                    callback_data=ProcedureCBData(proc=proc['id']).pack()
                 )
             ]
         )
-
+    keyboard.inline_keyboard.append([InlineKeyboardButton(text="Назад", callback_data="salon_reservation")])
     return keyboard
 
 
-def generate_dates_kb(salon_id, proc_id, specialists):
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[])
+def generate_date_kb(salon_id, procedures, specialists):
     dates = set()
     for spec in specialists:
-        if proc_id not in spec.get("procedures", []):
-            continue
-        for date, salons in spec.get("schedule", {}).items():
-            if salon_id in salons and salons[salon_id]:
+        schedule = spec.get("schedule", {})
+        for date, salons_map in schedule.items():
+            if salon_id in salons_map and salons_map[salon_id]:
                 dates.add(date)
     keyboard = InlineKeyboardMarkup(inline_keyboard=[])
     for date in sorted(dates):
         keyboard.inline_keyboard.append([
-            InlineKeyboardButton(text=date, callback_data=DateCB(date=date).pack())
+            InlineKeyboardButton(text=date, callback_data=DateCBData(date=date).pack())
         ])
+    keyboard.inline_keyboard.append([InlineKeyboardButton(text="Назад", callback_data="salon_reservation")])
     return keyboard
 
 
 def generate_time_kb(salon_id, proc_id, date, specialists):
-    buttons = []
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[])
     for spec in specialists:
-        if proc_id not in spec.get("procedures", []):
+        if not proc_id or proc_id not in spec.get("procedures", []):
             continue
-        times = spec.get("schedule", {}).get(date, {}).get(salon_id, [])
+        schedule = spec.get("schedule", {}).get(date, {})
+        times = schedule.get(salon_id, [])
         for time in times:
-            time = time.replace(":", "-")
-            buttons.append([
+            keyboard.inline_keyboard.append([
                 InlineKeyboardButton(
                     text=f"{time} — {spec.get('name')}",
-                    callback_data=TimeCB(spec=spec['id'], time=time).pack()
+                    callback_data=TimeCBData(spec=spec['id'], time=time.replace(":", "-")).pack()
                 )
             ])
-    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+    keyboard.inline_keyboard.append([InlineKeyboardButton(text="Назад", callback_data="salon_reservation")])
     return keyboard
 
 
-def generate_confirm_kb():
-    kb = InlineKeyboardMarkup(inline_keyboard=[
+def generate_personal_data_kb():
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="Согласен(на) на обработку ПД", callback_data="pd:accept"),
-            InlineKeyboardButton(text="Не согласен(на)", callback_data="pd:decline"),
-            ]
+            InlineKeyboardButton(text="Согласен(на) на обработку пд", callback_data=ConfirmCBData(action="accept_personal").pack()),
+            InlineKeyboardButton(text="Не согласен(на) на обработку пд", callback_data=ConfirmCBData(action="decline_personal").pack()),
         ]
-    )
-    return kb
+    ])
+
+    return keyboard
 
 
 def generate_request_contact_kb():
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="Отправить контакт", request_contact=True)],
-            [KeyboardButton(text="Ввести вручную")]
+            [KeyboardButton(text="Отмена")],
         ],
         resize_keyboard=True,
-        one_time_keyboard=True,
+        one_time_keyboard=True
     )
+
     return keyboard
 
 
-def make_confirmation_kb():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Подтвердить запись", callback_data="res:confirm")],
-        [InlineKeyboardButton(text="Отменить", callback_data="res:cancel")],
+def generate_confirm_reservation_kb():
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="Подтвердить запись", callback_data=ConfirmCBData(action="finalize").pack()),
+            InlineKeyboardButton(text="Отменить", callback_data=ConfirmCBData(action="cancel").pack()),
+        ]
     ])
+
+    return keyboard
 
 
 def get_promocode_kb():
-    """Создать клавиатуру для шага с промокодом."""
     decline_btn = InlineKeyboardButton(
         text="Пропустить",
         callback_data="continue",
