@@ -1,5 +1,4 @@
 import asyncio
-import requests
 from decouple import config
 from aiogram import F, Router, types
 from aiogram.fsm.state import StatesGroup, State
@@ -326,14 +325,12 @@ async def handle_pd(callback: types.CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data.startswith("pay:"))
 async def handle_payment(callback: types.CallbackQuery, state: FSMContext):
-    print(f"DEBUG: handle_payment triggered with data: {callback.data}")
     payment_method = callback.data.split(":", 1)[1]
     await state.update_data(payment_method=payment_method)
 
     data = await state.get_data()
     price = data.get("price")
     summary = data.get("summary")
-    print(f"DEBUG: price={price}, summary exists={bool(summary)}")
 
     if payment_method == "online" and price:
         order_id = f"order_{callback.from_user.id}_{datetime.now().timestamp()}"
