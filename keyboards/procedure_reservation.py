@@ -115,3 +115,21 @@ def get_promocode_kb():
     )
 
     return keyboard
+
+
+def generate_payment_kb(price):
+    if not price:
+        return make_confirmation_kb()
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text=f"Оплатить {price}₽ онлайн",
+                callback_data="pay:online"
+            ),
+            InlineKeyboardButton(
+                text="Оплатить наличными в салоне",
+                callback_data="pay:cash"
+            ),
+        ]
+    ])
+    return keyboard

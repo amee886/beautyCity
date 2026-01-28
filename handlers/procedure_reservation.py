@@ -1,3 +1,6 @@
+import asyncio
+import requests
+from decouple import config
 from aiogram import F, Router, types
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.context import FSMContext
@@ -12,9 +15,9 @@ from keyboards.procedure_reservation import (
     make_consent_kb,
     make_request_contact_kb,
     make_confirmation_kb,
-    get_promocode_kb
+    get_promocode_kb,
+    generate_payment_kb
 )
-
 from config import SALONS, PROCEDURES, SPECIALISTS, PROMOCODES
 from db_utils import save_appointment
 
@@ -34,6 +37,11 @@ class ProcReservationStates(StatesGroup):
     entering_promocode = State()
     confirming_personal = State()
     confirming_reservation = State()
+    choosing_payment = State()
+
+
+def create_paymaster_invoice(amount, description, order_id):
+    return f"https://example.com/pay/{order_id}"
 
 
 @router.callback_query(F.data == "procedure_reservation")
@@ -204,8 +212,12 @@ async def phone_contact(message: types.Message, state: FSMContext):
     phone = message.contact.phone_number.strip()
     await state.update_data(phone=phone)
     await message.answer("Контакт получен", reply_markup=ReplyKeyboardRemove())
-    await state.set_state(ProcReservationStates.confirming_personal)
-    await message.answer("Необходимо ваше согласие на обработку персональных данных", reply_markup=make_consent_kb())
+    # Изменено: переход к entering_promocode вместо confirming_personal
+    await state.set_state(ProcReservationStates.entering_promocode)
+    await message.answer(
+        text="Введите промокод, чтобы получить скидку!",
+        reply_markup=get_promocode_kb()
+    )
 
 
 @router.message(ProcReservationStates.entering_phone)
@@ -274,7 +286,7 @@ async def handle_pd(callback: types.CallbackQuery, state: FSMContext):
 
     await callback.answer()
     await state.update_data(personal_data_consent=True)
-    await state.set_state(ProcReservationStates.confirming_reservation)
+    await state.set_state(ProcReservationStates.choosing_payment)
 
     data = await state.get_data()
     proc = data.get("procedure")
@@ -289,6 +301,10 @@ async def handle_pd(callback: types.CallbackQuery, state: FSMContext):
     time = data.get("time", "-")
     discount = data.get("discount_percent")
 
+    price = proc["prices"].get(salon["id"]) if proc and salon else None
+    if discount and price:
+        price = price * (100 - discount) / 100
+
     summary = (
         f"Пожалуйста, подтвердите запись:\n\n"
         f"Процедура: {proc_name}\n"
@@ -300,31 +316,89 @@ async def handle_pd(callback: types.CallbackQuery, state: FSMContext):
         f"Телефон: {phone}\n\n"
     )
 
-    await state.update_data(summary=summary)
+    await state.update_data(summary=summary, price=price)
+    payment_kb = generate_payment_kb(price)
+    await callback.message.edit_text(
+        summary + "Выберите способ оплаты:",
+        reply_markup=payment_kb
+    )
+
+
+@router.callback_query(F.data.startswith("pay:"))
+async def handle_payment(callback: types.CallbackQuery, state: FSMContext):
+    print(f"DEBUG: handle_payment triggered with data: {callback.data}")
+    payment_method = callback.data.split(":", 1)[1]
+    await state.update_data(payment_method=payment_method)
+
+    data = await state.get_data()
+    price = data.get("price")
+    summary = data.get("summary")
+    print(f"DEBUG: price={price}, summary exists={bool(summary)}")
+
+    if payment_method == "online" and price:
+        order_id = f"order_{callback.from_user.id}_{datetime.now().timestamp()}"
+        payment_url = create_paymaster_invoice(price, "Оплата услуги в салоне красоты", order_id)
+        if payment_url:
+            await callback.message.edit_text(
+                f"{summary}Оплатите по ссылке: {payment_url}\nПосле оплаты запись будет подтверждена.",
+                reply_markup=None
+            )
+            await state.update_data(order_id=order_id)
+            asyncio.create_task(simulate_payment_success(callback.bot, callback.from_user.id, order_id, state))
+        else:
+            await callback.message.edit_text("Ошибка генерации ссылки оплаты. Попробуйте позже.")
+    elif payment_method == "cash":
+        await callback.message.edit_text(
+            f"{summary} Оплата наличными выбрана. Оплатите при посещении салона.",
+            reply_markup=make_confirmation_kb()
+        )
+        await state.set_state(ProcReservationStates.confirming_reservation)
+    await callback.answer()
+
+
+async def simulate_payment_success(bot, user_id, order_id, state):
+    await asyncio.sleep(5)
+    await state.update_data(paid=True)
+    await bot.send_message(
+        chat_id=user_id,
+        text="Оплата прошла успешно! Теперь подтвердите запись.",
+        reply_markup=make_confirmation_kb()
+    )
+    await state.set_state(ProcReservationStates.confirming_reservation)
+
+
+@router.callback_query(F.data == "res:confirm")
+async def handle_res_confirm(callback: types.CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    payment_method = data.get("payment_method")
+    price = data.get("price")
+    discount = data.get("discount_percent")
+
+    if payment_method == "online" and not data.get("paid"):
+        await callback.answer("Сначала оплатите услугу онлайн.")
+        return
+
+    proc = data.get("procedure")
+    master = data.get("master")
+    salon_id = data.get("salon")
+    date = data.get("date")
+    time = data.get("time")
+    promo_code = data.get("promo_code")
+
     save_appointment(
         user_id=callback.from_user.id,
         procedure_id=proc["id"] if proc else None,
         specialist_id=master.get("id") if master else None,
-        salon_id=salon["id"] if salon else None,
+        salon_id=salon_id,
         date=date,
         time=time,
-        price_original=proc["prices"].get(salon["id"]) if proc and salon else None,
+        price_original=proc["prices"].get(salon_id) if proc and salon_id else None,
         discount_percent=None,
         price_final=None,
         promo_code=None,
         source="bot"
     )
-    await callback.message.edit_text(
-        summary, 
-        reply_markup=make_confirmation_kb()
-    )
-
-
-@router.callback_query(F.data == "res:confirm")
-async def handle_res_confirm(callback: types.CallbackQuery, state: FSMContext):
     await callback.answer("Запись подтверждена")
-    data = await state.get_data()
-    summary = data.get("summary")
     await callback.message.edit_text("Ваша запись подтверждена\n\n")
     await state.clear()
 
@@ -334,3 +408,13 @@ async def handlerescancel(callback: types.CallbackQuery, state: FSMContext):
     await callback.answer("Запись отменена")
     await callback.message.edit_text("Запись отменена пользователем")
     await state.clear()
+
+
+@router.callback_query(F.data == "pay_cash")
+async def pay_cash(callback: types.CallbackQuery):
+    await callback.answer()
+    await state.update_data(payment_method="cash")
+    try:
+        await callback.message.edit_text("Оплата наличными выбрана. Оплатите при посещении салона. Спасибо!")
+    except Exception:
+        await callback.message.answer("Оплата наличными выбрана. Оплатите при посещении салона. Спасибо!")
